@@ -332,14 +332,6 @@ infoPanel.classList.add('show');
 const backdrop=document.getElementById('infoPanelBackdrop');
 if(backdrop)backdrop.classList.add('show');
 currentTarget=targetIndex;
-if(apiConfig.url&&apiConfig.key&&apiConfig.appId){
-chatContainer.classList.add('show');
-const toggleButton=document.getElementById('chatToggleButton');
-setTimeout(()=>{
-const chatHeight=chatContainer.offsetHeight;
-toggleButton.style.bottom=(chatHeight+30)+'px';
-},100);
-}
 updateImportButtons(targetIndex);
 }else{
 console.warn('未找到索引为',targetIndex,'的文物信息');
@@ -349,14 +341,6 @@ infoPanel.classList.add('show');
 const backdrop2=document.getElementById('infoPanelBackdrop');
 if(backdrop2)backdrop2.classList.add('show');
 currentTarget=null;
-if(apiConfig.url&&apiConfig.key&&apiConfig.appId){
-chatContainer.classList.add('show');
-const toggleButton=document.getElementById('chatToggleButton');
-setTimeout(()=>{
-const chatHeight=chatContainer.offsetHeight;
-toggleButton.style.bottom=(chatHeight+30)+'px';
-},100);
-}
 updateImportButtons(null);
 }
 }
