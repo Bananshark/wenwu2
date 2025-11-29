@@ -1,0 +1,118 @@
+{
+  "api": {
+    "url": "https://dashscope.aliyuncs.com/api/v1/apps/d93cb258746a4c25a49c6c0a8edb0ead/completion",
+    "key": "sk-3dac8516f796455f8f936e144b8af931",
+    "appId": "d93cb258746a4c25a49c6c0a8edb0ead",
+    "description": "API配置信息，可在界面中配置或在此文件中设置默认值"
+  },
+  "textDisplay": {
+    "speed": 50,
+    "description": "文字显示速度，单位：毫秒/字"
+  },
+  "ui": {
+    "title": "AR文物智能介绍系统",
+    "subtitle": "通过AR识别文物，查看介绍并与AI对话",
+    "description": "UI文本配置"
+  },
+  "mindFile": {
+    "path": "./mind/ding_table_college_kid.mind",
+    "description": "MindAR识别文件路径"
+  },
+  "artifacts": {
+    "0": {
+      "title": "中山王厝铁足铜鼎",
+      "content": "这件国宝是战国时期神秘中山国君主'厝'的陵墓重器，以其铜身铁足的独特工艺和鼎身上刻有的迄今最长战国铭文而闻名。铭文如同一部青铜史书，揭示了中山国的世系与历史，是研究这个'神秘王国'最关键的证据，堪称无价之宝。",
+      "buttons": {
+        "button1": {
+          "text": "了解历史",
+          "content": "请详细介绍一下中山王厝铁足铜鼎的历史背景和重要意义。"
+        },
+        "button2": {
+          "text": "工艺特点",
+          "content": "请解释一下中山王厝铁足铜鼎的铜身铁足工艺特点和制作技术。"
+        }
+      },
+      "model": {
+        "id": "Fe_foot",
+        "path": "./model/Fe_foot.gltf",
+        "targetIndex": 0,
+        "position": "0 -0.25 0",
+        "rotation": "0 0 0",
+        "scale": "1 1 1",
+        "enableAnimation": true
+      }
+    },
+    "1": {
+      "title": "错金银四龙四凤铜方案座",
+      "content": "这件战国时期中山国的青铜杰作，以其精巧绝伦的错金银工艺闻名。四龙四凤相互缠绕盘绕，形成玲珑剔透的立体结构，集铸造、镶嵌、装饰美学于一身，是代表战国时期青铜工艺巅峰水平的艺术瑰宝。",
+      "buttons": {
+        "button1": {
+          "text": "艺术价值",
+          "content": "请详细介绍一下错金银四龙四凤铜方案座的艺术价值和美学特点。"
+        },
+        "button2": {
+          "text": "制作工艺",
+          "content": "请解释一下错金银工艺的制作过程和这种工艺的技术难点。"
+        }
+      },
+      "model": {
+        "id": "table",
+        "path": "./model/Fe_foot.gltf",
+        "targetIndex": 1,
+        "position": "0 -0.25 0",
+        "rotation": "0 0 0",
+        "scale": "1 1 1",
+        "enableAnimation": true
+      }
+    },
+    "2": {
+      "title": "石家庄邮电职业技术学院",
+      "content": "石家庄邮电职业技术学院始建于1956年，是教育部批准的公办全日制普通高校，隶属中国邮政集团有限公司，是我国唯一一所以培养邮政专门人才为主的高等院校。学院构建了邮政快递、现代金融、信息技术等六大特色专业群，并入选国家'双高计划'建设单位。凭借独特的订单式人才培养模式，学院与全国邮政企业深度合作，为学生提供了'毕业即就业'的畅通渠道，被誉为邮政行业的'黄埔军校'。同时，学院也是中共中国邮政集团有限公司党校和培训中心，形成了集高职教育、在职培训、科研支撑于一体的多功能办学格局。",
+      "buttons": {
+        "button1": {
+          "text": "学院特色",
+          "content": "请介绍一下石家庄邮电职业技术学院的办学特色和优势专业。"
+        },
+        "button2": {
+          "text": "人才培养",
+          "content": "请详细说明一下石家庄邮电职业技术学院的订单式人才培养模式。"
+        }
+      },
+      "model": {
+        "id": "college",
+        "path": "./model/Fe_foot.gltf",
+        "targetIndex": 2,
+        "position": "0 -0.25 0",
+        "rotation": "0 0 0",
+        "scale": "1 1 1",
+        "enableAnimation": true
+      }
+    },
+    "3": {
+      "title": "鼎鼎",
+      "content": "这是项目鼎鼎",
+      "buttons": {
+        "button1": {
+          "text": "项目介绍",
+          "content": "请介绍一下这个项目的背景和特点。"
+        },
+        "button2": {
+          "text": "功能说明",
+          "content": "请说明一下这个项目的主要功能和使用方法。"
+        }
+      },
+      "model": {
+        "id": "dingding",
+        "path": "./model/kid-hello.glb",
+        "targetIndex": 3,
+        "position": "0 -0.25 0",
+        "rotation": "0 -90 0",
+        "scale": "1 1 1",
+        "enableAnimation": true
+      }
+    }
+  },
+  "version": "1.0.0",
+  "description": "AR文物智能介绍系统配置文件"
+}
+

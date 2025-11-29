@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AR文物智能介绍系统</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;overflow:hidden}
+#arScene{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+#arScene a-scene{width:100%;height:100%}
+.info-panel{position:fixed;top:0;right:-400px;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 10px rgba(0,0,0,.2);z-index:100;transition:right .3s ease;overflow-y:auto;padding:20px}
+.info-panel.show{right:0}
+.info-panel h2{font-size:20px;color:#333;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #667eea}
+.info-panel .info-content{color:#666;line-height:1.8;font-size:14px;margin-bottom:20px}
+.info-panel .close-btn{position:absolute;top:15px;right:15px;width:30px;height:30px;border:0;background:#667eea;color:#fff;border-radius:50%;cursor:pointer;font-size:18px;line-height:30px;text-align:center}
+.info-panel .close-btn:hover{background:#5568d3}
+.chat-container{position:fixed;bottom:80px;right:20px;width:350px;background:#fff;border-radius:8px;padding:15px;box-shadow:0 2px 10px rgba(0,0,0,.2);z-index:200;display:none;transition:right .3s ease,bottom .3s ease}
+.chat-container.show{display:block}
+.info-panel.show ~ .chat-container{right:420px}
+.messages-container{height:200px;overflow-y:auto;padding:10px;background:#f9f9f9;border-radius:8px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px}
+.message{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;word-wrap:break-word}
+.user-message{align-self:flex-end;background:#667eea;color:#fff}
+.bot-message{align-self:flex-start;background:#fff;color:#333;border:1px solid #e0e0e0}
+.input-container{display:flex;gap:8px}
+#userInput{flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:20px;font-size:13px;outline:0}
+#userInput:focus{border-color:#667eea}
+#sendButton{padding:8px 16px;border:0;border-radius:20px;background:#667eea;color:#fff;font-size:13px;cursor:pointer}
+#sendButton:hover{background:#5568d3}
+.chat-toggle-button{position:fixed;bottom:20px;right:20px;width:50px;height:50px;border-radius:50%;background:#667eea;border:0;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:201;font-size:24px;transition:right .3s ease,bottom .3s ease}
+.chat-toggle-button:hover{background:#5568d3}
+.chat-toggle-button.above-chat{bottom:auto;top:auto}
+.info-panel.show ~ .chat-toggle-button{right:420px}
+.typing-indicator{display:none;align-self:flex-start;background:#fff;padding:8px 12px;border-radius:12px;border:1px solid #e0e0e0;margin-bottom:8px;font-size:13px}
+.typing-indicator.show{display:block}
+.typing-dots{display:inline-flex;gap:4px;margin-left:8px}
+.typing-dots span{width:6px;height:6px;background:#667eea;border-radius:50%;animation:typing 1.4s infinite}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes typing{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+.import-buttons-container{position:absolute;top:-45px;left:0;display:none;gap:8px;z-index:201}
+.import-buttons-container.show{display:flex}
+.import-button{padding:8px 16px;background:#667eea;color:#fff;border:0;border-radius:20px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);white-space:nowrap}
+.import-button:hover{background:#5568d3}
+@media (max-width:768px){
+.info-panel{width:100%;right:-100%}
+.chat-container{width:calc(100% - 40px);right:20px;max-width:calc(100vw - 40px);bottom:80px}
+.info-panel.show ~ .chat-container{right:20px!important}
+.info-panel.show ~ .chat-toggle-button{right:20px!important}
+.chat-container .import-buttons-container{top:-40px}
+}
+@media (max-width:480px){
+.chat-container{width:calc(100% - 20px);right:10px;bottom:80px}
+.chat-toggle-button{right:10px}
+.info-panel.show ~ .chat-container{right:10px}
+.info-panel.show ~ .chat-toggle-button{right:10px}
+}
+</style>
+</head>
+<body>
+<div id="arScene">
+<a-scene id="arSceneContainer" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+<a-assets id="assetsContainer">
+<!-- 模型资源将动态加载 -->
+</a-assets>
+<a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+<!-- AR目标实体将动态生成 -->
+</a-scene>
+</div>
+<div class="info-panel" id="infoPanel">
+<button class="close-btn" id="closeInfo">×</button>
+<h2 id="infoTitle">文物介绍</h2>
+<div class="info-content" id="infoContent">正在加载介绍信息...</div>
+</div>
+<div class="chat-container" id="chatContainer">
+<div class="import-buttons-container" id="importButtonsContainer">
+<button class="import-button" id="importButton1">按钮1</button>
+<button class="import-button" id="importButton2">按钮2</button>
+</div>
+<div class="messages-container" id="messagesContainer"></div>
+<div class="typing-indicator" id="typingIndicator"><span>AI正在思考</span><div class="typing-dots"><span></span><span></span><span></span></div></div>
+<div class="input-container">
+<input type="text" id="userInput" placeholder="输入您的问题..." autocomplete="off">
+<button id="sendButton">发送</button>
+</div>
+</div>
+<button class="chat-toggle-button" id="chatToggleButton" title="打开聊天">💬</button>
+<script>
+let artifactInfo={};
+let artifactModels={};
+let artifactButtons={};
+let apiConfig={url:"",key:"",appId:""},isWaitingForResponse=false,currentTarget=null;
+let mindFilePath="./mind/postcard&table.mind";
+const scene=document.querySelector('#arSceneContainer');
+const infoPanel=document.getElementById('infoPanel');
+const chatContainer=document.getElementById('chatContainer');
+async function showInfo(targetIndex){
+if(!artifactInfo||Object.keys(artifactInfo).length===0){
+await loadConfig();
+}
+const info=artifactInfo[targetIndex];
+if(info){
+document.getElementById('infoTitle').textContent=info.title;
+document.getElementById('infoContent').textContent=info.content;
+infoPanel.classList.add('show');
+currentTarget=targetIndex;
+if(apiConfig.url&&apiConfig.key&&apiConfig.appId){
+chatContainer.classList.add('show');
+const toggleButton=document.getElementById('chatToggleButton');
+setTimeout(()=>{
+const chatHeight=chatContainer.offsetHeight;
+toggleButton.style.bottom=(chatHeight+30)+'px';
+},100);
+}
+updateImportButtons(targetIndex);
+}else{
+console.warn('未找到索引为',targetIndex,'的文物信息');
+document.getElementById('infoTitle').textContent='文物介绍';
+document.getElementById('infoContent').textContent='未找到该文物的介绍信息，请检查config.json配置。';
+infoPanel.classList.add('show');
+currentTarget=null;
+if(apiConfig.url&&apiConfig.key&&apiConfig.appId){
+chatContainer.classList.add('show');
+const toggleButton=document.getElementById('chatToggleButton');
+setTimeout(()=>{
+const chatHeight=chatContainer.offsetHeight;
+toggleButton.style.bottom=(chatHeight+30)+'px';
+},100);
+}
+updateImportButtons(null);
+}
+}
+function updateImportButtons(targetIndex){
+const buttonsContainer=document.getElementById('importButtonsContainer');
+const button1=document.getElementById('importButton1');
+const button2=document.getElementById('importButton2');
+let hasButtons=false;
+if(targetIndex!==null&&artifactButtons[targetIndex]){
+const buttons=artifactButtons[targetIndex];
+if(buttons.button1){
+button1.textContent=buttons.button1.text||'按钮1';
+button1.dataset.content=buttons.button1.content||'';
+button1.style.display='block';
+hasButtons=true;
+}else{
+button1.style.display='none';
+}
+if(buttons.button2){
+button2.textContent=buttons.button2.text||'按钮2';
+button2.dataset.content=buttons.button2.content||'';
+button2.style.display='block';
+hasButtons=true;
+}else{
+button2.style.display='none';
+}
+}else{
+button1.style.display='none';
+button2.style.display='none';
+}
+if(hasButtons&&apiConfig.url&&apiConfig.key&&apiConfig.appId){
+buttonsContainer.classList.add('show');
+}else{
+buttonsContainer.classList.remove('show');
+}
+}
+function hideInfo(){
+infoPanel.classList.remove('show');
+document.getElementById('importButtonsContainer').classList.remove('show');
+currentTarget=null;
+if(!chatContainer.classList.contains('show')){
+const toggleButton=document.getElementById('chatToggleButton');
+toggleButton.style.bottom='20px';
+}
+}
+function toggleChat(){
+const toggleButton=document.getElementById('chatToggleButton');
+if(chatContainer.classList.contains('show')){
+chatContainer.classList.remove('show');
+toggleButton.style.bottom='20px';
+}else{
+chatContainer.classList.add('show');
+const chatHeight=chatContainer.offsetHeight;
+toggleButton.style.bottom=(chatHeight+30)+'px';
+if(document.getElementById('messagesContainer').children.length===0){
+if(apiConfig.url&&apiConfig.key&&apiConfig.appId){
+addMessage('你好！我是AI智能助手。我可以为您介绍文物的历史、文化背景等信息。','bot');
+}else{
+addMessage('请先在config.json中配置API信息。','bot');
+}
+}
+}
+}
+document.getElementById('closeInfo').addEventListener('click',hideInfo);
+document.getElementById('chatToggleButton').addEventListener('click',toggleChat);
+document.getElementById('importButton1').addEventListener('click',function(){
+const content=this.dataset.content;
+if(content&&content.trim()!==''){
+document.getElementById('userInput').value=content;
+if(!isWaitingForResponse){
+sendMessage();
+}
+}
+});
+document.getElementById('importButton2').addEventListener('click',function(){
+const content=this.dataset.content;
+if(content&&content.trim()!==''){
+document.getElementById('userInput').value=content;
+if(!isWaitingForResponse){
+sendMessage();
+}
+}
+});
+async function loadConfig(){
+try{
+const r=await fetch('config.json?t='+Date.now(),{cache:'no-cache'});
+if(!r.ok)throw new Error('配置文件加载失败');
+const c=await r.json();
+if(c.api){
+apiConfig.url=c.api.url||"";
+apiConfig.key=c.api.key||"";
+apiConfig.appId=c.api.appId||"";
+}
+if(c.mindFile&&c.mindFile.path){
+mindFilePath=c.mindFile.path;
+}
+if(c.artifacts){
+artifactInfo={};
+artifactModels={};
+artifactButtons={};
+for(const key in c.artifacts){
+const artifact=c.artifacts[key];
+artifactInfo[key]={
+title:artifact.title,
+content:artifact.content
+};
+if(artifact.model){
+artifactModels[key]=artifact.model;
+}
+if(artifact.buttons){
+artifactButtons[key]=artifact.buttons;
+}
+}
+console.log('已加载文物信息:',artifactInfo);
+console.log('已加载模型配置:',artifactModels);
+console.log('已加载按钮配置:',artifactButtons);
+buildScene();
+}else{
+console.warn('配置文件中未找到artifacts信息');
+}
+}catch(e){console.warn('配置文件加载失败:',e.message);}
+}
+function buildScene(){
+if(!scene)return;
+scene.setAttribute('mindar-image',`imageTargetSrc:${mindFilePath};`);
+const assetsContainer=document.getElementById('assetsContainer');
+const sceneEntities=scene.querySelectorAll('[mindar-image-target]');
+sceneEntities.forEach(el=>el.remove());
+assetsContainer.innerHTML='';
+for(const key in artifactModels){
+const model=artifactModels[key];
+const assetItem=document.createElement('a-asset-item');
+assetItem.setAttribute('id',model.id);
+assetItem.setAttribute('src',model.path);
+assetsContainer.appendChild(assetItem);
+const targetEntity=document.createElement('a-entity');
+targetEntity.setAttribute('mindar-image-target',`targetIndex: ${model.targetIndex}`);
+targetEntity.setAttribute('id',`target${key}`);
+const gltfModel=document.createElement('a-gltf-model');
+gltfModel.setAttribute('rotation',model.rotation||'0 0 0');
+gltfModel.setAttribute('position',model.position||'0 -0.25 0');
+gltfModel.setAttribute('scale',model.scale||'1 1 1');
+gltfModel.setAttribute('src',`#${model.id}`);
+if(model.enableAnimation){
+gltfModel.setAttribute('animation-mixer','');
+}
+targetEntity.appendChild(gltfModel);
+scene.appendChild(targetEntity);
+setTimeout(function(){
+const targetEl=document.getElementById(`target${key}`);
+if(targetEl){
+targetEl.addEventListener('targetFound',function(){showInfo(key);});
+targetEl.addEventListener('targetLost',function(){hideInfo();});
+}
+},100);
+}
+console.log('场景构建完成');
+}
+function setupEventListeners(){
+const sb=document.getElementById('sendButton'),ui=document.getElementById('userInput');
+sb.addEventListener('click',sendMessage);
+ui.addEventListener('keypress',function(e){if(e.key==='Enter'&&!isWaitingForResponse)sendMessage();});
+}
+async function sendMessage(){
+const m=document.getElementById('userInput').value.trim();
+if(!m)return;
+if(!apiConfig.url||!apiConfig.key||!apiConfig.appId){
+addMessage('请先在config.json中配置API信息。','bot');
+return;
+}
+disableInput();
+addMessage(m,'user');
+document.getElementById('userInput').value='';
+document.getElementById('typingIndicator').classList.add('show');
+await callAPI(m);
+}
+async function callAPI(message){
+try{
+const c=new AbortController(),t=setTimeout(()=>c.abort(),60000);
+const r=await fetch(apiConfig.url,{method:'POST',headers:{'Authorization':`Bearer ${apiConfig.key}`,'Content-Type':'application/json'},body:JSON.stringify({input:{prompt:message},parameters:{temperature:0.7,max_tokens:2000}}),signal:c.signal});
+clearTimeout(t);
+if(!r.ok)throw new Error(`API错误: ${r.status} ${r.statusText}`);
+const result=await r.json();
+document.getElementById('typingIndicator').classList.remove('show');
+let answer="抱歉，无法解析API响应";
+if(result.output&&result.output.text)answer=result.output.text;
+else if(result.choices&&result.choices[0]&&result.choices[0].message)answer=result.choices[0].message.content;
+else if(result.response)answer=result.response;
+if(!answer||answer.trim()==='')answer="抱歉，AI没有返回有效回复，请重试。";
+await typeMessage(answer,'bot');
+}catch(error){
+document.getElementById('typingIndicator').classList.remove('show');
+let em='发生未知错误';
+if(error.name==='AbortError')em='请求超时，请检查网络连接或稍后重试';
+else if(error.message)em=error.message;
+addMessage(`抱歉，${em}`,'bot');
+console.error('API调用错误:',error);
+}finally{enableInput();}
+}
+function addMessage(text,sender){
+const e=document.createElement('div');
+e.classList.add('message',sender==='user'?'user-message':'bot-message');
+e.textContent=text;
+document.getElementById('messagesContainer').appendChild(e);
+const c=document.getElementById('messagesContainer');
+c.scrollTop=c.scrollHeight;
+}
+function typeMessage(text,sender){
+return new Promise(resolve=>{
+const e=document.createElement('div');
+e.classList.add('message',sender==='user'?'user-message':'bot-message');
+document.getElementById('messagesContainer').appendChild(e);
+let i=0;
+const id=setInterval(()=>{
+if(i<text.length){e.textContent+=text.charAt(i);i++;const c=document.getElementById('messagesContainer');c.scrollTop=c.scrollHeight;}
+else{clearInterval(id);resolve();}
+},50);
+});
+}
+function disableInput(){document.getElementById('userInput').disabled=true;document.getElementById('sendButton').disabled=true;isWaitingForResponse=true;}
+function enableInput(){document.getElementById('userInput').disabled=false;document.getElementById('sendButton').disabled=false;isWaitingForResponse=false;document.getElementById('userInput').focus();}
+document.addEventListener('DOMContentLoaded',async function(){await loadConfig();setupEventListeners();});
+</script>
+</body>
+</html>
+
