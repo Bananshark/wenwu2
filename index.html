@@ -58,6 +58,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-
 .info-panel.show ~ .chat-container{right:10px}
 .info-panel.show ~ .chat-toggle-button{right:10px}
 }
+.error-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1000;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px}
+.error-box{background:#fff;border-radius:12px;padding:30px;max-width:500px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.3);text-align:center}
+.error-box h2{color:#e74c3c;margin-bottom:15px;font-size:22px}
+.error-box p{color:#666;line-height:1.8;margin-bottom:20px;font-size:14px}
+.error-box .error-icon{font-size:48px;margin-bottom:15px}
+.error-box .action-btn{padding:12px 24px;background:#667eea;color:#fff;border:0;border-radius:20px;cursor:pointer;font-size:14px;margin:5px}
+.error-box .action-btn:hover{background:#5568d3}
+.error-box .action-btn.secondary{background:#95a5a6}
+.error-box .action-btn.secondary:hover{background:#7f8c8d}
+.error-box ul{text-align:left;color:#666;line-height:2;margin:15px 0;padding-left:20px;font-size:13px}
 </style>
 </head>
 <body>
@@ -88,6 +98,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-
 </div>
 </div>
 <button class="chat-toggle-button" id="chatToggleButton" title="打开聊天">💬</button>
+<div class="error-overlay" id="errorOverlay" style="display:none">
+<div class="error-box">
+<div class="error-icon">⚠️</div>
+<h2 id="errorTitle">摄像头权限问题</h2>
+<p id="errorMessage"></p>
+<div id="errorActions"></div>
+</div>
+</div>
 <script>
 let artifactInfo={};
 let artifactModels={};
@@ -97,6 +115,71 @@ let mindFilePath="./mind/postcard&table.mind";
 const scene=document.querySelector('#arSceneContainer');
 const infoPanel=document.getElementById('infoPanel');
 const chatContainer=document.getElementById('chatContainer');
+function isHTTPS(){
+return window.location.protocol==='https:'||window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'||window.location.hostname==='[::1]';
+}
+function showError(title,message,actions){
+const overlay=document.getElementById('errorOverlay');
+const titleEl=document.getElementById('errorTitle');
+const messageEl=document.getElementById('errorMessage');
+const actionsEl=document.getElementById('errorActions');
+titleEl.textContent=title;
+messageEl.innerHTML=message;
+actionsEl.innerHTML='';
+if(actions&&actions.length>0){
+actions.forEach(action=>{
+const btn=document.createElement('button');
+btn.className='action-btn'+(action.secondary?' secondary':'');
+btn.textContent=action.text;
+btn.onclick=action.callback;
+actionsEl.appendChild(btn);
+});
+}
+overlay.style.display='flex';
+}
+function hideError(){
+document.getElementById('errorOverlay').style.display='none';
+}
+async function checkCameraPermission(){
+try{
+const stream=await navigator.mediaDevices.getUserMedia({video:true});
+stream.getTracks().forEach(track=>track.stop());
+return true;
+}catch(error){
+console.error('摄像头权限检查失败:',error);
+return false;
+}
+}
+async function requestCameraPermission(){
+try{
+const stream=await navigator.mediaDevices.getUserMedia({video:true});
+stream.getTracks().forEach(track=>track.stop());
+hideError();
+location.reload();
+return true;
+}catch(error){
+console.error('摄像头权限请求失败:',error);
+let errorMsg='无法访问摄像头。';
+if(error.name==='NotAllowedError'){
+errorMsg='摄像头权限被拒绝。请在浏览器设置中允许访问摄像头，然后刷新页面。';
+}else if(error.name==='NotFoundError'){
+errorMsg='未找到摄像头设备。请确保您的设备已连接摄像头。';
+}else if(error.name==='NotReadableError'){
+errorMsg='摄像头被其他应用占用。请关闭其他使用摄像头的应用后重试。';
+}else if(error.message){
+errorMsg=error.message;
+}
+showError('摄像头权限错误',errorMsg,[{text:'重试',callback:requestCameraPermission},{text:'取消',callback:hideError,secondary:true}]);
+return false;
+}
+}
+function checkEnvironment(){
+if(!isHTTPS()){
+showError('需要HTTPS连接','您的网站需要通过HTTPS协议访问才能使用摄像头功能。<br><br><strong>解决方案：</strong><ul><li>使用HTTPS部署您的网站</li><li>如果您是开发环境，可以使用本地服务器（localhost）</li><li>联系网站管理员配置SSL证书</li></ul>',[{text:'我知道了',callback:hideError}]);
+return false;
+}
+return true;
+}
 async function showInfo(targetIndex){
 if(!artifactInfo||Object.keys(artifactInfo).length===0){
 await loadConfig();
@@ -254,6 +337,7 @@ console.warn('配置文件中未找到artifacts信息');
 }
 function buildScene(){
 if(!scene)return;
+try{
 scene.setAttribute('mindar-image',`imageTargetSrc:${mindFilePath};`);
 const assetsContainer=document.getElementById('assetsContainer');
 const sceneEntities=scene.querySelectorAll('[mindar-image-target]');
@@ -286,7 +370,34 @@ targetEl.addEventListener('targetLost',function(){hideInfo();});
 }
 },100);
 }
+scene.addEventListener('arReady',function(){
+console.log('AR场景已就绪');
+hideError();
+});
+scene.addEventListener('arError',function(event){
+console.error('AR错误:',event.detail);
+let errorMsg='AR初始化失败。';
+if(event.detail){
+if(event.detail.includes('camera')||event.detail.includes('摄像头')){
+errorMsg='无法访问摄像头。请检查摄像头权限和浏览器设置。';
+showError('摄像头访问失败',errorMsg+'<br><br><strong>可能的原因：</strong><ul><li>浏览器未授予摄像头权限</li><li>摄像头被其他应用占用</li><li>浏览器不支持WebRTC</li></ul>',[{text:'请求权限',callback:async function(){await requestCameraPermission();}},{text:'取消',callback:hideError,secondary:true}]);
+return;
+}
+errorMsg=event.detail;
+}
+showError('AR初始化错误',errorMsg,[{text:'重试',callback:function(){location.reload();}},{text:'取消',callback:hideError,secondary:true}]);
+});
+setTimeout(async function(){
+const hasPermission=await checkCameraPermission();
+if(!hasPermission){
+showError('摄像头权限被拒绝','无法访问摄像头。AR功能需要摄像头权限才能正常工作。<br><br><strong>请按照以下步骤操作：</strong><ul><li>点击浏览器地址栏左侧的锁图标或信息图标</li><li>在权限设置中允许访问摄像头</li><li>刷新页面重试</li></ul>',[{text:'请求权限',callback:requestCameraPermission},{text:'取消',callback:hideError,secondary:true}]);
+}
+},1000);
 console.log('场景构建完成');
+}catch(error){
+console.error('场景构建错误:',error);
+showError('场景构建失败',`构建AR场景时发生错误：${error.message}`,[{text:'刷新页面',callback:function(){location.reload();}},{text:'取消',callback:hideError,secondary:true}]);
+}
 }
 function setupEventListeners(){
 const sb=document.getElementById('sendButton'),ui=document.getElementById('userInput');
@@ -351,7 +462,42 @@ else{clearInterval(id);resolve();}
 }
 function disableInput(){document.getElementById('userInput').disabled=true;document.getElementById('sendButton').disabled=true;isWaitingForResponse=true;}
 function enableInput(){document.getElementById('userInput').disabled=false;document.getElementById('sendButton').disabled=false;isWaitingForResponse=false;document.getElementById('userInput').focus();}
-document.addEventListener('DOMContentLoaded',async function(){await loadConfig();setupEventListeners();});
+window.addEventListener('error',function(event){
+if(event.message&&(event.message.includes('getUserMedia')||event.message.includes('camera')||event.message.includes('摄像头')||event.message.includes('permission'))){
+console.error('捕获到摄像头相关错误:',event.message);
+if(document.getElementById('errorOverlay').style.display==='none'){
+showError('摄像头错误','检测到摄像头访问错误。请检查浏览器权限设置。',[{text:'请求权限',callback:requestCameraPermission},{text:'取消',callback:hideError,secondary:true}]);
+}
+}
+});
+window.addEventListener('unhandledrejection',function(event){
+if(event.reason&&(event.reason.name==='NotAllowedError'||event.reason.name==='NotFoundError'||event.reason.name==='NotReadableError'||event.reason.message&&(event.reason.message.includes('camera')||event.reason.message.includes('摄像头')))){
+console.error('捕获到未处理的摄像头错误:',event.reason);
+event.preventDefault();
+if(document.getElementById('errorOverlay').style.display==='none'){
+let errorMsg='无法访问摄像头。';
+if(event.reason.name==='NotAllowedError'){
+errorMsg='摄像头权限被拒绝。请在浏览器设置中允许访问摄像头。';
+}else if(event.reason.name==='NotFoundError'){
+errorMsg='未找到摄像头设备。';
+}else if(event.reason.name==='NotReadableError'){
+errorMsg='摄像头被其他应用占用。';
+}
+showError('摄像头访问失败',errorMsg+'<br><br>请刷新页面并授予摄像头权限后重试。',[{text:'请求权限',callback:requestCameraPermission},{text:'刷新页面',callback:function(){location.reload();}},{text:'取消',callback:hideError,secondary:true}]);
+}
+}
+});
+document.addEventListener('DOMContentLoaded',async function(){
+if(!checkEnvironment()){
+return;
+}
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+showError('浏览器不支持','您的浏览器不支持摄像头访问功能。请使用最新版本的Chrome、Firefox、Safari或Edge浏览器。',[{text:'我知道了',callback:hideError}]);
+return;
+}
+await loadConfig();
+setupEventListeners();
+});
 </script>
 </body>
 </html>
