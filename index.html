@@ -115,6 +115,7 @@ let mindFilePath="./mind/postcard&table.mind";
 const scene=document.querySelector('#arSceneContainer');
 const infoPanel=document.getElementById('infoPanel');
 const chatContainer=document.getElementById('chatContainer');
+let mindarInitialized=false;
 function isHTTPS(){
 return window.location.protocol==='https:'||window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'||window.location.hostname==='[::1]';
 }
@@ -329,16 +330,57 @@ artifactButtons[key]=artifact.buttons;
 console.log('已加载文物信息:',artifactInfo);
 console.log('已加载模型配置:',artifactModels);
 console.log('已加载按钮配置:',artifactButtons);
-buildScene();
+await buildScene();
 }else{
 console.warn('配置文件中未找到artifacts信息');
 }
 }catch(e){console.warn('配置文件加载失败:',e.message);}
 }
-function buildScene(){
+async function buildScene(){
 if(!scene)return;
 try{
-scene.setAttribute('mindar-image',`imageTargetSrc:${mindFilePath};`);
+const hasPermission=await checkCameraPermission();
+if(!hasPermission){
+showError('需要摄像头权限','AR功能需要摄像头权限才能正常工作。请允许访问摄像头。',[{text:'请求权限',callback:async function(){
+const granted=await requestCameraPermission();
+if(granted){
+await buildScene();
+}
+}},{text:'取消',callback:hideError,secondary:true}]);
+return;
+}
+await new Promise((resolve)=>{
+if(scene.hasLoaded){
+resolve();
+}else{
+scene.addEventListener('loaded',resolve,{once:true});
+}
+});
+if(!mindFilePath){
+console.warn('Mind文件路径未配置');
+return;
+}
+const mindarAttr=`imageTargetSrc:${mindFilePath};`;
+if(mindarInitialized){
+console.log('更新mindar-image属性');
+scene.setAttribute('mindar-image',mindarAttr);
+setTimeout(()=>{
+const mindarSystem=scene.systems['mindar-image-system'];
+if(mindarSystem){
+try{
+mindarSystem.stop();
+mindarSystem.start();
+console.log('重新启动AR系统');
+}catch(e){
+console.warn('重新启动AR系统失败:',e);
+}
+}
+},100);
+}else{
+scene.setAttribute('mindar-image',mindarAttr);
+mindarInitialized=true;
+console.log('已设置mindar-image属性，路径:',mindFilePath);
+}
 const assetsContainer=document.getElementById('assetsContainer');
 const sceneEntities=scene.querySelectorAll('[mindar-image-target]');
 sceneEntities.forEach(el=>el.remove());
@@ -370,29 +412,49 @@ targetEl.addEventListener('targetLost',function(){hideInfo();});
 }
 },100);
 }
-scene.addEventListener('arReady',function(){
+let arReadyHandler=null;
+let arErrorHandler=null;
+arReadyHandler=function(){
 console.log('AR场景已就绪');
 hideError();
-});
-scene.addEventListener('arError',function(event){
+if(arReadyHandler)scene.removeEventListener('arReady',arReadyHandler);
+if(arErrorHandler)scene.removeEventListener('arError',arErrorHandler);
+};
+arErrorHandler=function(event){
 console.error('AR错误:',event.detail);
 let errorMsg='AR初始化失败。';
 if(event.detail){
-if(event.detail.includes('camera')||event.detail.includes('摄像头')){
+if(event.detail.includes('camera')||event.detail.includes('摄像头')||event.detail.includes('permission')||event.detail.includes('getUserMedia')){
 errorMsg='无法访问摄像头。请检查摄像头权限和浏览器设置。';
-showError('摄像头访问失败',errorMsg+'<br><br><strong>可能的原因：</strong><ul><li>浏览器未授予摄像头权限</li><li>摄像头被其他应用占用</li><li>浏览器不支持WebRTC</li></ul>',[{text:'请求权限',callback:async function(){await requestCameraPermission();}},{text:'取消',callback:hideError,secondary:true}]);
+showError('摄像头访问失败',errorMsg+'<br><br><strong>可能的原因：</strong><ul><li>浏览器未授予摄像头权限</li><li>摄像头被其他应用占用</li><li>浏览器不支持WebRTC</li><li>需要HTTPS连接</li></ul>',[{text:'请求权限',callback:async function(){
+const granted=await requestCameraPermission();
+if(granted){
+location.reload();
+}
+}},{text:'取消',callback:hideError,secondary:true}]);
+if(arReadyHandler)scene.removeEventListener('arReady',arReadyHandler);
+if(arErrorHandler)scene.removeEventListener('arError',arErrorHandler);
 return;
 }
 errorMsg=event.detail;
 }
 showError('AR初始化错误',errorMsg,[{text:'重试',callback:function(){location.reload();}},{text:'取消',callback:hideError,secondary:true}]);
-});
-setTimeout(async function(){
-const hasPermission=await checkCameraPermission();
-if(!hasPermission){
-showError('摄像头权限被拒绝','无法访问摄像头。AR功能需要摄像头权限才能正常工作。<br><br><strong>请按照以下步骤操作：</strong><ul><li>点击浏览器地址栏左侧的锁图标或信息图标</li><li>在权限设置中允许访问摄像头</li><li>刷新页面重试</li></ul>',[{text:'请求权限',callback:requestCameraPermission},{text:'取消',callback:hideError,secondary:true}]);
+if(arReadyHandler)scene.removeEventListener('arReady',arReadyHandler);
+if(arErrorHandler)scene.removeEventListener('arError',arErrorHandler);
+};
+scene.addEventListener('arReady',arReadyHandler);
+scene.addEventListener('arError',arErrorHandler);
+setTimeout(()=>{
+const mindarSystem=scene.systems['mindar-image-system'];
+if(mindarSystem){
+try{
+mindarSystem.start();
+console.log('手动启动AR系统');
+}catch(e){
+console.warn('手动启动AR系统失败:',e);
 }
-},1000);
+}
+},500);
 console.log('场景构建完成');
 }catch(error){
 console.error('场景构建错误:',error);
@@ -493,6 +555,17 @@ return;
 }
 if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
 showError('浏览器不支持','您的浏览器不支持摄像头访问功能。请使用最新版本的Chrome、Firefox、Safari或Edge浏览器。',[{text:'我知道了',callback:hideError}]);
+return;
+}
+const hasPermission=await checkCameraPermission();
+if(!hasPermission){
+showError('需要摄像头权限','AR功能需要摄像头权限才能正常工作。请先允许访问摄像头。',[{text:'请求权限',callback:async function(){
+const granted=await requestCameraPermission();
+if(granted){
+await loadConfig();
+setupEventListeners();
+}
+}},{text:'取消',callback:hideError,secondary:true}]);
 return;
 }
 await loadConfig();
